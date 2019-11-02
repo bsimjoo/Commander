@@ -14,26 +14,45 @@ namespace CommanderClient
 {
 	public partial class Service1 : ServiceBase
 	{
-		public static EventLog Log = new EventLog();
 		public Service1() {
 			InitializeComponent();
-			if (!EventLog.SourceExists("Commander")) {
-				EventLog.CreateEventSource("Commander", "Commander Client");
-			}
-			Log.Source = "Commander";
-			Log.Log = "Commander client";
 		}
 
 		protected override void OnStart(string[] args) {
-			Log.WriteEntry("Starting", EventLogEntryType.Information);
-			var xmlReader = new XmlDataDocument();
-			if (File.Exists(@"C:\CommanderConfig\Config.xml")) {
-				xmlReader.Load(@"C:\CommanderConfig\Config.xml");
-				string ip = xmlReader.GetElementById("serverip").InnerText;
-				string customName = xmlReader.GetElementById("customName").InnerText;
-				Log.WriteEntry($"config readed: IP:{ip} CustomName:{customName}");
-			} else
-				this.Stop();
+			using (StreamReader Reader = new StreamReader(new FileStream(@"C:\Commander\Config.cfg", FileMode.Open))) {
+				if (Reader.ReadLine().ToLower() == "[commanderconfig]") {
+					string line = Reader.ReadLine();
+					string[] linePart = line.Split(';');
+					switch (linePart[0].ToLower()) {
+					case "ip":
+						CommonVar.ipAddr = linePart[1];
+						break;
+					case "port":
+						CommonVar.port = linePart[1];
+						break;
+					case "customname":
+						CommonVar.CustomName = linePart[1];
+						break;
+					case "debug":
+						ProcessStartInfo st = new ProcessStartInfo() {
+							FileName = "cmd.exe",
+							Arguments = "/k echo off",
+							RedirectStandardInput = true,
+							UseShellExecute = false,
+							CreateNoWindow = false,
+							WindowStyle = ProcessWindowStyle.Normal
+						};
+						Program.logger.outputStream = Process.Start(st).StandardInput;
+						Program.logger.prefix = "echo";
+						break;
+					default:
+						Program.logger.Log(logType.Warning, "inavald config file");
+						break;
+					}
+				} else {
+					Program.logger.Log(logType.Error, "inavald config file");
+				}
+			}
 		}
 
 		protected override void OnStop() {
