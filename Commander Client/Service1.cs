@@ -33,25 +33,24 @@ namespace CommanderClient
 					case "customname":
 						CommonVar.CustomName = linePart[1];
 						break;
-					case "debug":
-						ProcessStartInfo st = new ProcessStartInfo() {
-							FileName = "cmd.exe",
-							Arguments = "/k echo off",
-							RedirectStandardInput = true,
-							UseShellExecute = false,
-							CreateNoWindow = false,
-							WindowStyle = ProcessWindowStyle.Normal
-						};
-						Program.logger.outputStream = Process.Start(st).StandardInput;
-						Program.logger.prefix = "echo";
-						break;
 					default:
-						Program.logger.Log(logType.Warning, "inavald config file");
+						Program.logger.Log(logType.Warning, "inavald config file attribute");
 						break;
 					}
 				} else {
 					Program.logger.Log(logType.Error, "inavald config file");
 				}
+				ProcessStartInfo stinf = new ProcessStartInfo() {
+					FileName = "cmd.exe",
+					RedirectStandardOutput = true,
+					RedirectStandardInput = true,
+					CreateNoWindow = true,
+					UseShellExecute = false,
+					Verb = "runas"
+				};
+				Process p = Process.Start(stinf);
+				CommonVar.CmdStandardInput = p.StandardInput;
+				CommonVar.CmdStandardOutput = p.StandardOutput;
 			}
 		}
 
