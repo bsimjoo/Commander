@@ -34,7 +34,7 @@ namespace CommanderClient
 							byte[] buffer = new byte[1024];
 							int count = ServerSocket.Receive(buffer);
 							Text += Encoding.ASCII.GetString(buffer, 0, count);
-						} catch (Exception ex) { Program.logger.Log(logType.Error, $"EXCEPTION IN CLIENT/READ: {ex.Message}"); }
+						} catch (Exception ex) { Program.logger.Log(logType.Error, $"EXCEPTION IN SERVER/READ: {ex.Message}"); }
 						if (Text.LastIndexOf("<$eof>") > -1)
 							break;
 					}
@@ -54,7 +54,7 @@ namespace CommanderClient
 						byte[] buffer = new byte[1024];
 						int count = ServerSocket.Receive(buffer);
 						Text += Encoding.ASCII.GetString(buffer, 0, count);
-					} catch (Exception ex) { Program.logger.Log(logType.Error, $"EXCEPTION IN CLIENT/READ: {ex.Message}"); }
+					} catch (Exception ex) { Program.logger.Log(logType.Error, $"EXCEPTION IN SERVER/READ: {ex.Message}"); }
 					if (Text.LastIndexOf("<$eof>") > -1)
 						break;
 				}
@@ -69,7 +69,7 @@ namespace CommanderClient
 			byte[] buffer = Encoding.ASCII.GetBytes(Text);
 			try {
 				ServerSocket.Send(buffer);
-			} catch (Exception ex) { Program.logger.Log(logType.Error, $"EXCEPTION IN CLIENT/SEND: {ex.Message}"); }
+			} catch (Exception ex) { Program.logger.Log(logType.Error, $"EXCEPTION IN SERVER/SEND: {ex.Message}"); }
 
 		}
 	}
