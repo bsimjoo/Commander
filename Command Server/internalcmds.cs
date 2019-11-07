@@ -12,17 +12,22 @@ namespace Command_Server {
             Commands["run"] = new command(Run);
             
         }
-        public void Do(string Command,string args) {
-            string[] Args = new Regex("\"([^ \"]+)\" | '([^'] +)'|([^\\s]+)").Split(args);
-            List<string> _Args = new List<string>(Args);
-            _Args.Remove(" ");
-            _Args.Remove("");
-            if (!Commands.Keys.Contains(Command)) {
-                Console.WriteLine($"\'{Command}\'is not recognized as an internal");
-            } else
-                Commands[Command](_Args.ToArray());
-            
-        }
+        public void Do(string CommandLine) {
+			string Command = CommandLine, args = "";
+			if (Regex.Matches(CommandLine, Properties.Resources.regexFormat).Count >= 2) {      //may be there is argument
+				Command = CommandLine.Substring(0, CommandLine.IndexOf(' '));
+				args = CommandLine.Substring(CommandLine.IndexOf(' '));
+			}
+			List<string> Args = new List<string>(new Regex(Properties.Resources.regexFormat).Split(args));
+			//^ there was too many special chars in regex format so I saved it in resources for easier access and edit.
+			//regex example -> https://regexr.com/4obll recommend to use external browser.
+			Args.Remove(" ");
+			Args.Remove("");
+			if (!Commands.Keys.Contains(Command)) {
+				Console.WriteLine($"\'{Command}\'is not recognized as an internal");
+			} else
+				Commands[Command](Args.ToArray());
+		}
         public static void Run(string[] args) {
             if (args.Length == 0)
                 Console.WriteLine("Usage: !run <program and arguments>\nlike: !run Python3 test.py");

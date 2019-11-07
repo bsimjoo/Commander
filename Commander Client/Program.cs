@@ -9,6 +9,7 @@ namespace CommanderClient
 {
 	static class Program
 	{
+		public static internalcmds internalCmd = new internalcmds();
 		public static Logger logger = new Logger(@"c:\Commander\Log.log");
 		/// <summary>
 		/// The main entry point for the application.

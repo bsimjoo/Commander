@@ -13,7 +13,7 @@ namespace Command_Server
 		public string[] ClientInfo = new string[3];
 		public ClientManager(Socket cs) {
 			ClientSocket = cs;
-			Send("<$>info");        //get client info by sending this keyword
+			Send("<$>info");        //get client info by sending $ flag and info keyword
 			string Text = "";
 			if (Read(true, out Text)) {     //check is there any thing to read?
 				string[] Parts = Text.Split(';');           //ComputerName;UserName;CostumName
@@ -50,21 +50,26 @@ namespace Command_Server
 		/// <returns></returns>
 		public bool Read(bool Wait, out string Text) {
 			Text = "";
+			int count = 0;
 			var t = DateTime.Now;
 			while (Wait && (t - DateTime.Now) <= new TimeSpan(0, 0, WaitSec)) {
-				try {
-					byte[] buffer = new byte[1024];
-					int count = ClientSocket.Receive(buffer);
-					Text += Encoding.ASCII.GetString(buffer, 0, count);
-				} catch (Exception ex) { Program.Log(Program.logType.Error, $"EXCEPTION IN CLIENT/READ: {ex.Message}"); break; }
-				if (Text.LastIndexOf("<$eof>") > -1)
-					break;
+				do {
+					try {
+						byte[] buffer = new byte[1024];
+						count = ClientSocket.Receive(buffer);
+						Text += Encoding.ASCII.GetString(buffer, 0, count);
+					} catch (Exception ex) { Program.Log(Program.logType.Error, $"EXCEPTION IN CLIENT/READ: {ex.Message}"); break; }
+					if (Text.Contains("<$eof>"))
+						break;
+				} while (count != 0);
 			}
-			if (Text.Length != 0)
-				Text.Replace("<$eof>", "");
-			return Text.Length != 0;
+			if (Text.Length != 0) {
+				try { Text.Replace("<$eof>", ""); } catch { /*do nothing*/ }
+			}
+			//if count be zero means that something went wrong. stream ended without <$eof> or there's nothing to read.
+			return count != 0;
 		}
-		public string DefFlag { get; set; } = "<nf>";		//Flages: n:normal, f:get feedback, a:admin, v:visible
+		public string DefFlag { get; set; } = "<nf>";		//Flages: e:just_check_exit_code, f:get_feedback, a:run_as_admin, v:visible_cmd_window
 		public void Send(string Text) {
 			Text =DefFlag+Text+"<$eof>";
 			byte[] buffer = Encoding.ASCII.GetBytes(Text);

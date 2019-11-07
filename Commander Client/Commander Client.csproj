@@ -45,7 +45,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ClientListener.cs" />
+    <Compile Include="Listener.cs" />
     <Compile Include="internalcmds.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="ProjectInstaller.cs">
