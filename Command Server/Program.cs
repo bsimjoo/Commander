@@ -10,7 +10,7 @@ namespace Command_Server
 {
 	class Program
 	{
-		static Dictionary<string, CommanderClient> Clients = new Dictionary<string, CommanderClient>();
+		static Dictionary<string, ClientManager> Clients = new Dictionary<string, ClientManager>();
 		static internalcmds internalCmd = new internalcmds();
 		static TcpListener Listener = default(TcpListener);
 		static void Main(string[] args) {
@@ -48,7 +48,7 @@ namespace Command_Server
 				string commandName = input.Split(' ')[0];
 				internalCmd.Do(commandName, input.Substring(commandName.Length));
 			} else {
-				foreach (CommanderClient cm in Clients.Values) {
+				foreach (ClientManager cm in Clients.Values) {
 					cm.Send(input);
 				}
 				Log(logType.Info, "Command sent to all clients");
@@ -59,7 +59,7 @@ namespace Command_Server
 
 			while (true) {
 				Socket s = Listener.AcceptSocket();
-				CommanderClient newClient = new CommanderClient(s);
+				ClientManager newClient = new ClientManager(s);
 				newClient.Disconnected += Client_Disconnected;
 				Log(logType.Info, $"A client connected from: {s.RemoteEndPoint}");
 				Log(logType.Info, string.Format("Computer name: {0}", newClient.ClientInfo));
@@ -70,12 +70,12 @@ namespace Command_Server
 						key = newClient.ClientInfo[2];
 					else {
 						Log(logType.Error, "No custom name. cannot assign client by a name.");
-						newClient.Disconnect(CommanderClient.DisconnectReason.internalError);
+						newClient.Disconnect(ClientManager.DisconnectReason.internalError);
 						continue;
 					}
 				} else {
 					Log(logType.Error, "Same name exists, so cannot assign client. Please change custom name for next time");
-					newClient.Disconnect(CommanderClient.DisconnectReason.internalError);
+					newClient.Disconnect(ClientManager.DisconnectReason.internalError);
 					continue;
 				}
 				Clients[newClient.ClientInfo[0].ToLower()] = newClient;
@@ -83,7 +83,7 @@ namespace Command_Server
 			}
 		}
 
-		private static void Client_Disconnected(CommanderClient client, CommanderClient.DisconnectReason r) {
+		private static void Client_Disconnected(ClientManager client, ClientManager.DisconnectReason r) {
 			if (Clients.ContainsKey(client.ClientInfo[0]))
 				Clients.Remove(client.ClientInfo[0]);
 			else if (Clients.ContainsKey(client.ClientInfo[2]))

@@ -5,11 +5,11 @@ using System.Text;
 using System.Threading;
 using System.Net.Sockets;
 namespace Command_Server {
-    class CommanderClient {
+    class ClientManager {
         public Socket ClientSocket = null;
         public int WaitSec { get; set; } = 30;
         public string[] ClientInfo=new string[3];
-        public CommanderClient(Socket cs) {
+        public ClientManager(Socket cs) {
             ClientSocket = cs;
             Send("<$>info");
             string Text = Read(true);
@@ -24,11 +24,11 @@ namespace Command_Server {
             th.Start(this);
         }
         private static void CheckClient(object client) {
-            CommanderClient cl = client as CommanderClient;
+            ClientManager cl = client as ClientManager;
             while (cl.ClientSocket.Connected) { }
             cl.Disconnect(DisconnectReason.clientClosed);
         }
-        public delegate void DisconnectEventHandler(CommanderClient client,DisconnectReason r);
+        public delegate void DisconnectEventHandler(ClientManager client,DisconnectReason r);
         public event DisconnectEventHandler Disconnected;
         public void Disconnect (DisconnectReason r){
             if (r == DisconnectReason.internalError || r == DisconnectReason.manual)

@@ -42,6 +42,10 @@ namespace CommanderClient
 						break;
 				}
 				Text.Replace("<$eof>", "");
+				switch (Text[0]) {
+				case "#":
+
+				}
 				CommonVar.CmdStandardInput.WriteLine(Text);
 			}
 		}
