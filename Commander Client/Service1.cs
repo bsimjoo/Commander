@@ -25,13 +25,13 @@ namespace CommanderClient
 					string[] linePart = line.Split(';');
 					switch (linePart[0].ToLower()) {
 					case "ip":
-						CommonVar.ipAddr = linePart[1];
+						ClientListener.ipAddr = linePart[1];
 						break;
 					case "port":
-						CommonVar.port = linePart[1];
+						ClientListener.port = linePart[1];
 						break;
 					case "customname":
-						CommonVar.CustomName = linePart[1];
+						ClientListener.CustomName = linePart[1];
 						break;
 					default:
 						Program.logger.Log(logType.Warning, "inavald config file attribute");
