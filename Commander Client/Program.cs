@@ -14,8 +14,14 @@ namespace CommanderClient
 		/// <summary>
 		/// The main entry point for the application.
 		/// </summary>
-		static void Main() {
+		static void Main(string[] arg) {
 			//running a windows service
+			if (arg.Length != 0)
+				if (arg[0] == "-d") {
+					Service1.main();
+					while (true) { System.Threading.Thread.Sleep(100); }
+				}
+			runservice:
 			ServiceBase[] ServicesToRun;
 			ServicesToRun = new ServiceBase[]
 			{

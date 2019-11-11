@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Threading;
 using System.Net.Sockets;
@@ -8,11 +9,15 @@ namespace Command_Server
 {
 	class ClientManager
 	{
+		public static string CommandFlags { get; set; }
 		public Socket ClientSocket = null;
+		public bool Muted { get; set; } = false;
 		public int WaitSec { get; set; } = 30;
 		public string[] ClientInfo = new string[3];
+		public string IDName { get; set; }
 		public ClientManager(Socket cs) {
 			ClientSocket = cs;
+			Program.Log(Program.logType.Info, "new client detected, getting information");
 			Send("<$>info");        //get client info by sending $ flag and info keyword
 			string Text = "";
 			if (Read(true, out Text)) {     //check is there any thing to read?
@@ -28,19 +33,26 @@ namespace Command_Server
 		private static void CheckClient(object client) {
 			ClientManager cl = client as ClientManager;
 			while (cl.ClientSocket.Connected) {
-				Thread.Sleep(500);      //limit using of resources and check for client connection state every 5 seconds.
+				Thread.Sleep(10);      //limit usage of resources and check for client connection state every 5 seconds.
+				if (!cl.Muted)
+					if (cl.Read(false, out string Text)) {
+						Program.ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"Output from {cl.IDName}".PadRight(Console.WindowWidth, '='));
+						Console.WriteLine(Text);
+					}
 			}
 			cl.Disconnect(DisconnectReason.clientClosed);
 		}
 		public delegate void DisconnectEventHandler(ClientManager client, DisconnectReason r);
 		public event DisconnectEventHandler Disconnected;
 		public void Disconnect(DisconnectReason r) {
-			if (r == DisconnectReason.internalError || r == DisconnectReason.manual)
-				Send("<$>close");
-			else
-				Send("<$>disconnected");
-			ClientSocket.Close();
-			Disconnected(this, r);
+			if (ClientSocket.Connected) {
+				if (r == DisconnectReason.internalError || r == DisconnectReason.manual)
+					Send("<$>close");
+				else
+					Send("<$>disconnected");
+				ClientSocket.Close();
+				Disconnected(this, r);
+			}
 		}
 		/// <summary>
 		/// if there's any text to read it returns true and else false.
@@ -52,29 +64,37 @@ namespace Command_Server
 			Text = "";
 			int count = 0;
 			var t = DateTime.Now;
-			while (Wait && (t - DateTime.Now) <= new TimeSpan(0, 0, WaitSec)) {
-				do {
-					try {
-						byte[] buffer = new byte[1024];
-						count = ClientSocket.Receive(buffer);
-						Text += Encoding.ASCII.GetString(buffer, 0, count);
-					} catch (Exception ex) { Program.Log(Program.logType.Error, $"EXCEPTION IN CLIENT/READ: {ex.Message}"); break; }
-					if (Text.Contains("<$eof>"))
+			while (ClientSocket.Connected) {
+				try {
+					byte[] buffer = new byte[1024];
+					count = ClientSocket.Receive(buffer);
+					Text += Encoding.ASCII.GetString(buffer, 0, count);
+				} catch (Exception ex) { Program.Log(Program.logType.Error, $"EXCEPTION IN CLIENT/READ: {ex.Message}"); break; }
+				if (Text.Contains("<$eof>")) {
+					break;
+				} else if (count == 0) {
+					if (Wait) {
+						if ((t - DateTime.Now) >= new TimeSpan(0, 0, WaitSec))
+							break;
+					} else
 						break;
-				} while (count != 0);
+				}
 			}
+			bool Empty = Text == "";
 			if (Text.Length != 0) {
-				try { Text.Replace("<$eof>", ""); } catch { /*do nothing*/ }
+				try { Text = Text.Replace("<$eof>", ""); } catch { /*do nothing*/ }
 			}
-			//if count be zero means that something went wrong. stream ended without <$eof> or there's nothing to read.
-			return count != 0;
+			return !Empty;
 		}
-		public string DefFlag { get; set; } = "<nf>";		//Flages: e:just_check_exit_code, f:get_feedback, a:run_as_admin, v:visible_cmd_window
 		public void Send(string Text) {
-			Text =DefFlag+Text+"<$eof>";
+			string Flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;    //get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
+			Flags = Flags.Trim('<', '>');
+			Flags += new string(CommandFlags.Select(c => (Flags.Contains(c) ? '\0' : c)).ToArray());
+			Text = $"<{Flags}>{Text.Substring(Flags.Length)}<$eof>";
 			byte[] buffer = Encoding.ASCII.GetBytes(Text);
 			try {
-				ClientSocket.Send(buffer);
+				if (ClientSocket.Connected)
+					ClientSocket.Send(buffer);
 			} catch (Exception ex) { Program.Log(Program.logType.Error, $"EXCEPTION IN CLIENT/SEND: {ex.Message}"); }
 
 		}

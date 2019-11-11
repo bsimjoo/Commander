@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace CommanderClient
 {
-	class ClientListener
+	class Listener
 	{
 		public static string ipAddr { get; set; }
 		public static string port { get; set; }
@@ -17,82 +17,54 @@ namespace CommanderClient
 		public static Process CommandProcess;
 
 		private static Socket ServerSocket;
-		public void Run() {
+		public static void Run() {
 			Thread th = new Thread(new ThreadStart(ClientThread));
 			th.Start();
 		}
 		static void ClientThread() {
 			//this thread will retry to connect when disconnected
-			IPAddress ip = IPAddress.Parse(ClientListener.ipAddr);
+			IPAddress ip = IPAddress.Parse(Listener.ipAddr);
 			ServerSocket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 			Thread th = new Thread(new ThreadStart(ListenToServer));
-			try {
-				while (true) {
-					Thread.Sleep(6000);		//wait for a minute for next retry
-					if (!ServerSocket.Connected) {
-						ServerSocket.Connect(ip, int.Parse(ClientListener.port));
+			while (true) {
+				Thread.Sleep(6000);     //wait for a minute for next retry
+				if (!ServerSocket.Connected) {
+					try {
+						Console.WriteLine("Connecting...");
+						ServerSocket.Connect(ip, int.Parse(Listener.port));
+						Console.WriteLine("Connected. Starting listenning thread.");
 						th.Start();
-					}
+					} catch (Exception ex) { Program.logger.Log(logType.Error, ex.Message); }
 				}
-			}catch(Exception ex) { Program.logger.Log(logType.Error, ex.Message); }
+			}
 		}
 		public static void ListenToServer() {
 			//this thread will get and read received text
+			Console.WriteLine("Listen Thread has been run");
 			while (ServerSocket.Connected) {
-				Thread.Sleep(10);
-				if (Read(true, out string text))
+				if (Read(true, out string text)) {
+					Console.WriteLine("Data received");
 					readInput(text);
+				}
 			}
 		}
 		static void readInput(string Text) {        //this method reads received text
-			string flags = Regex.Match(Text, @"^\<\w+\>", RegexOptions.Multiline).Value;	//get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
+			Console.WriteLine("readInput(\"{0}\")", Text);
+			string flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;	//get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
 			Text = Text.Substring(flags.Length);		//remove flags
-			flags.Trim('<', '>');
-			foreach(char f in flags) {
-				switch (f) {
-				//Flages: $:server_message, e:just_check_exit_code, a:run_as_admin, v:visible_cmd_window, n:normal, s:shell execute
+			flags=flags.Trim('<', '>');
+			Console.WriteLine("Flags:\"{0}\"\nData:\"{1}\"", flags, Text);
 
-				//server internall commands flag
-				case '$': {
-						//this line must run by internalcmd.Do
-						Program.internalCmd.Do(Text);
-					}
-					break;
+			//Flages: $:server_message, e:just_check_exit_code, a:run_as_admin, v:visible_cmd_window, n:normal, s:shell execute
 
-				//run command and set start info properties
-				default: {
-						//get filename and arguments
-						string args = "";
-						if (Text.Contains(" ")) {
-							args = Text.Substring(Text.IndexOf(' ') + 1);
-							Text = Text.Substring(0, Text.IndexOf(' '));
-						}
-						ProcessStartInfo stinf = new ProcessStartInfo() {
-							FileName = Text,
-							Arguments = args,
-						};
-						if (flags.Contains("v")) {
-							//visible flag founded so cannot redirect input and output
-							stinf.CreateNoWindow = false;
-							stinf.WindowStyle = ProcessWindowStyle.Normal;
-							stinf.FileName = "cmd.exe";
-							stinf.Arguments = $"/c {Text} {args}";
-						} else if (flags.Contains("s")) {
-							//shell excute flag
-							stinf.UseShellExecute = true;
-						} else if(!flags.Contains("e")) {	//flags not contains "e"
-							//redirect all outputs
-							stinf.RedirectStandardOutput = true;
-							stinf.RedirectStandardInput = true;
-							stinf.RedirectStandardError = true;
-							stinf.UseShellExecute = false;
-						}
-
-						if (flags.Contains("a")) stinf.Verb = "runas";
-
-						//start process
-					}
-					break;
+			if (flags.Contains("$")) {
+				//internall commands flag
+				//this line must run by internalcmd.Do
+				Console.WriteLine("Internal Command:\"{0}\"", Text);
+				Program.internalCmd.Do(Text);
+			} else {
+				//common command
+				foreach (char f in flags) {
 				}
 			}
 		}
@@ -102,24 +74,29 @@ namespace CommanderClient
 			Text = "";
 			int count = 0;
 			var t = DateTime.Now;
-			while (Wait && (t - DateTime.Now) <= new TimeSpan(0, 0, WaitSec)) {
-				do {
+			while (true) {
 					try {
 						byte[] buffer = new byte[1024];
 						count = ServerSocket.Receive(buffer);
 						Text += Encoding.ASCII.GetString(buffer, 0, count);
 					} catch (Exception ex) { Program.logger.Log(logType.Error, $"EXCEPTION IN CLIENT/READ: {ex.Message}"); break; }
-					if (Text.Contains("<$eof>"))
+					 if(Text.Contains("<$eof>")){
 						break;
-				} while (count != 0);
-			}
+					}else if(count==0){
+						if(Wait){
+							if( (t - DateTime.Now) >= new TimeSpan(0, 0, WaitSec) )
+								break;
+						}else
+							break;
+					}
+				}
+				bool Empty=Text=="";
 			if (Text.Length != 0) {
-				try { Text.Replace("<$eof>", ""); } catch { /*do nothing*/ }
+				try { Text=Text.Replace("<$eof>", ""); } catch { /*do nothing*/ }
 			}
-			//if count be zero means that something went wrong. stream ended without <$eof> or there's nothing to read.
-			return count != 0;
+			return !Empty;
 		}
-		public void Send(string Text) {
+		public static void Send(string Text) {
 			Text += "<$eof>";
 			byte[] buffer = Encoding.ASCII.GetBytes(Text);
 			try {

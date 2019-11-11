@@ -8,27 +8,50 @@ using System.Threading.Tasks;
 namespace Command_Server {
     class internalcmds {
         public static Dictionary<string, command> Commands = new Dictionary<string, command>();
-        public internalcmds() {
+		public static Dictionary<string, string> Discribtions = new Dictionary<string, string>();
+
+		public internalcmds() {
             Commands["run"] = new command(Run);
-            
-        }
+			Discribtions["run"] = "Run a program or script and get commands from standard output.\nUsage: run [program] [arguments]\n";
+
+			Commands["help"] = new command(Help);
+			Discribtions["help"] = "Show discribtion of a command or all commands\nUsage: help [command] or help\n";
+
+			Commands["send"] = new command(Send);
+			Discribtions["send"] = "Send a command to a specified client\nUsage: send [client] [command]\n";
+
+			Commands["disconnect"] = new command(Disconnect);
+			Discribtions["disconnect"] = "disconnect one or more client(s)\nUsage: disconnect [client1] [client2] ...";
+
+			Commands["mute"] = new command(MuteClient);
+			Discribtions["mute"] = "mute one or more or all client(s)\nUsage: mute [client1] [client2] ... or mute all";
+
+			Commands["unmute"] = new command(MuteClient);
+			Discribtions["unmute"] = "unmute one or more or all client(s)\nUsage: unmute [client1] [client2] ... or unmute all";
+		}
         public void Do(string CommandLine) {
-			string Command = CommandLine, args = "";
-			if (Regex.Matches(CommandLine, Properties.Resources.regexFormat).Count >= 2) {      //may be there is argument
-				Command = CommandLine.Substring(0, CommandLine.IndexOf(' '));
-				args = CommandLine.Substring(CommandLine.IndexOf(' '));
+			string Command = CommandLine;
+			var M = Regex.Matches(CommandLine, Properties.Resources.regexFormat);
+			List<string> Args = new List<string>();
+			if (M.Count >= 2) {     //may be there is argument
+				Command = M[0].Value;
+				for (int i = 1; i < M.Count; i++) {
+					Args.Add(M[i].Value);
+				}
+				Args.Remove(" ");
+				Args.Remove("");
 			}
-			List<string> Args = new List<string>(new Regex(Properties.Resources.regexFormat).Split(args));
 			//^ there was too many special chars in regex format so I saved it in resources for easier access and edit.
 			//regex example -> https://regexr.com/4obll recommend to use external browser.
-			Args.Remove(" ");
-			Args.Remove("");
+
+			Console.WriteLine($"Running {Command} with {Args.Count} Argument(s).");
 			if (!Commands.Keys.Contains(Command)) {
-				Console.WriteLine($"\'{Command}\'is not recognized as an internal");
+				Console.WriteLine($"\'{Command}\' is not recognized as an internal command");
 			} else
 				Commands[Command](Args.ToArray());
+
 		}
-        public static void Run(string[] args) {
+		public static void Run(string[] args) {
             if (args.Length == 0)
                 Console.WriteLine("Usage: !run <program and arguments>\nlike: !run Python3 test.py");
             else {
@@ -50,6 +73,86 @@ namespace Command_Server {
                 }
             }
         }
-    }
+		public static void Help(string[] args) {
+			if (args.Length >= 1) {
+				if (Commands.ContainsKey(args[0]))
+					Console.WriteLine(Discribtions[args[0]]);
+				else
+					Console.WriteLine($"\'{args[0]}\' is not recognized as an internal command");
+			} else {
+				foreach(var entery in Discribtions)
+					Console.WriteLine($"{entery.Key}\t{entery.Value}");
+			}
+		}
+		public static void Send(string[] args) {
+			if (args.Length >= 2) {
+				if (Program.Clients.ContainsKey(args[0])) {
+					string text = string.Join(" ", args, 1,args.Length-1);
+					Program.Clients[args[0]].Send(text);
+				} else {
+					Console.WriteLine("No such client found");
+				}
+			} else {
+				Console.WriteLine("Bad command usage.");
+			}
+		}
+		public static void Disconnect(string[] args) {
+			if (args.Length >= 1) {
+				foreach (string client in args) {
+					if (Program.Clients.ContainsKey(client)) {
+						Program.Clients[client].Disconnect(ClientManager.DisconnectReason.manual);
+						Console.WriteLine($"Disconnected from \"{client}\"");
+					} else {
+						Console.WriteLine($"No such client found that named as\"{client}\".");
+					}
+				}
+			} else {
+				Console.WriteLine("Bad command usage.");
+			}
+		}
+		public static void SetFlag(string[] args) {
+
+		}
+		public static void MuteClient(string[] args) {
+			if (args.Length == 0) {
+				if (args[0] == "all") {
+					foreach (var c in Program.Clients.Values)
+						c.Muted = true;
+					Console.WriteLine("Muted all clients.");
+				}
+			} else if (args.Length > 1) {
+				foreach (string client in args) {
+					if (Program.Clients.ContainsKey(client)) {
+						Program.Clients[client].Muted = true;
+						Console.WriteLine($"muted \"{client}\"");
+					} else {
+						Console.WriteLine($"No such client found that named as\"{client}\".");
+					}
+				}
+			} else {
+				Console.WriteLine("Bad command usage.");
+			}
+		}
+		public static void UnMuteClient(string[] args) {
+			if (args.Length == 0) {
+				if (args[0] == "all") {
+					foreach (var c in Program.Clients.Values)
+						c.Muted = false;
+					Console.WriteLine("Muted all clients.");
+				}
+			} else if (args.Length > 1) {
+				foreach (string client in args) {
+					if (Program.Clients.ContainsKey(client)) {
+						Program.Clients[client].Muted = false;
+						Console.WriteLine($"muted \"{client}\"");
+					} else {
+						Console.WriteLine($"No such client found that named as\"{client}\".");
+					}
+				}
+			} else {
+				Console.WriteLine("Bad command usage.");
+			}
+		}
+	}
     delegate void command(string[] args);
 }

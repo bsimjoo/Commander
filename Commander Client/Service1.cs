@@ -19,42 +19,38 @@ namespace CommanderClient
 		}
 
 		protected override void OnStart(string[] args) {
-			using (StreamReader Reader = new StreamReader(new FileStream(@"C:\Commander\Config.cfg", FileMode.Open))) {
-				if (Reader.ReadLine().ToLower() == "[commanderconfig]") {
-					string line = Reader.ReadLine();
-					string[] linePart = line.Split(';');
-					switch (linePart[0].ToLower()) {
-					case "ip":
-						Listener.ipAddr = linePart[1];
-						break;
-					case "port":
-						Listener.port = linePart[1];
-						break;
-					case "customname":
-						Listener.CustomName = linePart[1];
-						break;
-					default:
-						Program.logger.Log(logType.Warning, "inavald config file attribute");
-						break;
-					}
-				} else {
-					Program.logger.Log(logType.Error, "inavald config file");
-				}
-				ProcessStartInfo stinf = new ProcessStartInfo() {
-					FileName = "cmd.exe",
-					RedirectStandardOutput = true,
-					RedirectStandardInput = true,
-					CreateNoWindow = true,
-					UseShellExecute = false,
-					Verb = "runas"
-				};
-				Process p = Process.Start(stinf);
-				CommonVar.CmdStandardInput = p.StandardInput;
-				CommonVar.CmdStandardOutput = p.StandardOutput;
-			}
+			main();
 		}
 
 		protected override void OnStop() {
+		}
+		public static void main() {
+			using (StreamReader Reader = new StreamReader(new FileStream(@"C:\Commander\Config.cfg", FileMode.Open))) {
+				if (Reader.ReadLine().ToLower() == "[commanderconfig]") {
+					do {
+						string line = Reader.ReadLine();
+						string[] linePart = line.Split(';');
+						switch (linePart[0].ToLower()) {
+						case "ip":
+							Listener.ipAddr = linePart[1];
+							break;
+						case "port":
+							Listener.port = linePart[1];
+							break;
+						case "customname":
+							Listener.CustomName = linePart[1];
+							break;
+						default:
+							Program.logger.Log(logType.Warning, "inavald config file attribute");
+							break;
+						}
+					} while (!Reader.EndOfStream);
+					Console.WriteLine("config:\nserver addres:{0}:{1}\ncustom name:{2}", Listener.ipAddr, Listener.port, Listener.CustomName);
+				} else {
+					Program.logger.Log(logType.Error, "inavald config file");
+				}
+			}
+			Listener.Run();
 		}
 	}
 }

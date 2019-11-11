@@ -5,23 +5,16 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Command_Server
 {
 	class Program
 	{
-		static Dictionary<string, ClientManager> Clients = new Dictionary<string, ClientManager>();
+		public static Dictionary<string, ClientManager> Clients = new Dictionary<string, ClientManager>();
 		static internalcmds internalCmd = new internalcmds();
 		static TcpListener Listener = default(TcpListener);
 		static void Main(string[] args) {
-			EventLog log = new EventLog();
-			if (!EventLog.SourceExists("Commander")) {
-				EventLog.CreateEventSource("Commander", "test");
-			}
-			log.Source = "Commander";
-			log.Log = "test";
-			log.WriteEntry("test");
-			Console.ReadKey(true);
 			Console.Title = $"Commander [{Clients.Count} clients]";
 			Log(logType.Info, "Running server...");
 			string hostName = Dns.GetHostName(); // Retrive the Name of HOST  
@@ -40,17 +33,20 @@ namespace Command_Server
 			Listener.Start();
 			Log(logType.Info, $"Tcp listener started on {myIP}:1111");
 			Log(logType.Info, "Waiting for a connection...");
+			Thread th = new Thread(server);
+			th.Start();
+			while (true) {
+				ReadInput(Console.ReadLine());
+			}
 		}
 		public static void ReadInput(string input) {
 			if (input.StartsWith("!")) {
 				input = input.Substring(1);
 				//internal command
-				string commandName = input.Split(' ')[0];
-				internalCmd.Do(commandName, input.Substring(commandName.Length));
+				internalCmd.Do(input);
 			} else {
-				foreach (ClientManager cm in Clients.Values) {
+				foreach (ClientManager cm in Clients.Values)
 					cm.Send(input);
-				}
 				Log(logType.Info, "Command sent to all clients");
 			}
 		}
@@ -73,12 +69,13 @@ namespace Command_Server
 						newClient.Disconnect(ClientManager.DisconnectReason.internalError);
 						continue;
 					}
-				} else {
+				} else if (Clients.ContainsKey(newClient.ClientInfo[2].ToLower())) {
 					Log(logType.Error, "Same name exists, so cannot assign client. Please change custom name for next time");
 					newClient.Disconnect(ClientManager.DisconnectReason.internalError);
 					continue;
-				}
-				Clients[newClient.ClientInfo[0].ToLower()] = newClient;
+				} else
+					newClient.IDName=key= newClient.ClientInfo[0].ToLower();
+				Clients[key] = newClient;
 				Console.Title = $"Commander [{Clients.Count} clients]";
 			}
 		}
@@ -110,6 +107,12 @@ namespace Command_Server
 		public enum logType
 		{
 			Info, Warning, Error
+		}
+		public static void ColoredWrite( ConsoleColor Background,ConsoleColor Foreground,string Text) {
+			Console.BackgroundColor = Background;
+			Console.ForegroundColor = Foreground;
+			Console.WriteLine(Text);
+			Console.ResetColor();
 		}
 	}
 }
