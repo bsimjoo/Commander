@@ -88,9 +88,10 @@ namespace Command_Server
 		}
 		public void Send(string Text) {
 			string Flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;    //get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
-			Flags = Flags.Trim('<', '>');
-			Flags += new string(CommandFlags.Select(c => (Flags.Contains(c) ? '\0' : c)).ToArray());
-			Text = $"<{Flags}>{Text.Substring(Flags.Length)}<$eof>";
+			/*if (CommandFlags != null)
+				CommandFlags += new string(CommandFlags.Select(c => (Flags.Contains(c) ? '\0' : c)).ToArray());
+			*/
+			Text = $"{Flags}{Text.Substring(Flags.Length)}<$eof>";
 			byte[] buffer = Encoding.ASCII.GetBytes(Text);
 			try {
 				if (ClientSocket.Connected)

