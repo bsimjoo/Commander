@@ -2,8 +2,9 @@
 using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace Command_Server {
     class internalcmds {
@@ -21,13 +22,23 @@ namespace Command_Server {
 			Discribtions["send"] = "Send a command to a specified client\nUsage: send [client] [command]\n";
 
 			Commands["disconnect"] = new command(Disconnect);
-			Discribtions["disconnect"] = "disconnect one or more client(s)\nUsage: disconnect [client1] [client2] ...";
+			Discribtions["disconnect"] = "disconnect one or more client(s)\nUsage: disconnect [client1] [client2] ...\n";
 
 			Commands["mute"] = new command(MuteClient);
-			Discribtions["mute"] = "mute one or more or all client(s)\nUsage: mute [client1] [client2] ... or mute all";
+			Discribtions["mute"] = "mute one or more or all client(s)\nUsage: mute [client1] [client2] ... or mute all\n";
 
 			Commands["unmute"] = new command(MuteClient);
-			Discribtions["unmute"] = "unmute one or more or all client(s)\nUsage: unmute [client1] [client2] ... or unmute all";
+			Discribtions["unmute"] = "unmute one or more or all client(s)\nUsage: unmute [client1] [client2] ... or unmute all\n";
+
+			Commands["clients"] = new command(Clients);
+			Discribtions["clients"] = "show all connected clients name\n";
+
+			Commands["directcmd"] = new command(DirectCmd.Run);
+			Discribtions["directcmd"] = "Run a remote cmd on a client\n";
+			Discribtions["closecmd"] = "Close a remote cmd on a client.\n";
+
+			Commands["setpref"] = new command(SetPrefix);
+			Discribtions["setpref"] = "set some test before input\n";
 		}
         public void Do(string CommandLine) {
 			string Command = CommandLine;
@@ -44,7 +55,7 @@ namespace Command_Server {
 			//^ there was too many special chars in regex format so I saved it in resources for easier access and edit.
 			//regex example -> https://regexr.com/4obll recommend to use external browser.
 
-			Console.WriteLine($"Running {Command} with {Args.Count} Argument(s).");
+			//Console.WriteLine($"Running {Command} with {Args.Count} Argument(s).");
 			if (!Commands.Keys.Contains(Command)) {
 				Console.WriteLine($"\'{Command}\' is not recognized as an internal command");
 			} else
@@ -113,6 +124,12 @@ namespace Command_Server {
 		public static void SetFlag(string[] args) {
 
 		}
+		public static void SetPrefix(string [] args) {
+			if (args.Length == 0)
+				Program.DefPrefix = "";
+			else
+				Program.DefPrefix = string.Join(" ", args);
+		}
 		public static void MuteClient(string[] args) {
 			if (args.Length == 0) {
 				if (args[0] == "all") {
@@ -153,6 +170,47 @@ namespace Command_Server {
 				Console.WriteLine("Bad command usage.");
 			}
 		}
+		public static void Clients(string [] args) => Console.WriteLine(string.Join(", ", Program.Clients.Keys));
+		public class DirectCmd
+		{
+			private static Thread Listener = new Thread(new ParameterizedThreadStart(CmdListener));
+			private static ClientManager Client;
+			public static void Run(string[] args) {
+				//run a remote cmd on client
+				if (args.Length == 1) {
+					if (Program.Clients.ContainsKey(args[0])) {
+						Client = Program.Clients[args[0]];
+						ClientManager.ReadClients = false;
+						Client.Send("<$>directcmd");      //sey client to run direct cmd protocol
+																			//this command need custom stream listener
+						
+						Listener.Start(Client);
+						Commands["closecmd"] = new command(Close);
+						Commands.Remove("directcmd");
+					} else {
+						Console.WriteLine($"No such client found that named as\"{args[0]}\".");
+					}
+				} else {
+					Console.WriteLine("Bad command usage.");
+				}
+			}
+			public static void Close(string[] args) {
+				Listener.Abort();
+				Client.Send("<$>closecmd");
+				ClientManager.ReadClients = true;
+				Commands["directcmd"] = new command(Run);
+				Commands.Remove("closecmd");
+				Console.WriteLine("Closed directcmd");
+			}
+			private static void CmdListener(object param) {
+				var Client = param as ClientManager;
+				while (Client.ClientSocket.Connected) {
+					if (Client.Read(true, out string Text))
+						Console.Write(Text);
+				}
+			}
+		}
+		
 	}
     delegate void command(string[] args);
 }

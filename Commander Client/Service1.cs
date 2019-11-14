@@ -32,7 +32,7 @@ namespace CommanderClient
 						string[] linePart = line.Split(';');
 						switch (linePart[0].ToLower()) {
 						case "ip":
-							Listener.ipAddr = linePart[1];
+							Listener.Host = linePart[1];
 							break;
 						case "port":
 							Listener.port = linePart[1];
@@ -45,7 +45,7 @@ namespace CommanderClient
 							break;
 						}
 					} while (!Reader.EndOfStream);
-					Console.WriteLine("config:\nserver addres:{0}:{1}\ncustom name:{2}", Listener.ipAddr, Listener.port, Listener.CustomName);
+					Console.WriteLine("config:\nserver addres:{0}:{1}\ncustom name:{2}", Listener.Host, Listener.port, Listener.CustomName);
 				} else {
 					Program.logger.Log(logType.Error, "inavald config file");
 				}

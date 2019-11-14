@@ -15,6 +15,7 @@ namespace Command_Server
 		public int WaitSec { get; set; } = 30;
 		public string[] ClientInfo = new string[3];
 		public string IDName { get; set; }
+		public static bool ReadClients = true;		//for direct cmd there's no need to read clients stream by checkClient thread
 		public ClientManager(Socket cs) {
 			ClientSocket = cs;
 			Program.Log(Program.logType.Info, "new client detected, getting information");
@@ -27,18 +28,18 @@ namespace Command_Server
 				Console.WriteLine("Request timed out. waited for {0}s", WaitSec);
 				Disconnect(DisconnectReason.timedOut);
 			}
-			Thread th = new Thread(new ParameterizedThreadStart(CheckClient));
-			th.Start(this);
+			Thread checkThread = new Thread(new ParameterizedThreadStart(CheckClient));
+			checkThread.Start(this);
 		}
 		private static void CheckClient(object client) {
 			ClientManager cl = client as ClientManager;
 			while (cl.ClientSocket.Connected) {
 				Thread.Sleep(10);      //limit usage of resources and check for client connection state every 5 seconds.
-				if (!cl.Muted)
-					if (cl.Read(false, out string Text)) {
-						Program.ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"Output from {cl.IDName}".PadRight(Console.WindowWidth, '='));
-						Console.WriteLine(Text);
-					}
+				if (cl.Read(false, out string Text)&&ReadClients) {
+					Program.ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"Output from \"{cl.IDName}\"".PadRight(Console.WindowWidth - 1, '='));
+					Console.WriteLine(Text);
+					Program.ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"=".PadRight(Console.WindowWidth - 1, '=')+'\n');
+				}
 			}
 			cl.Disconnect(DisconnectReason.clientClosed);
 		}
@@ -85,6 +86,11 @@ namespace Command_Server
 				try { Text = Text.Replace("<$eof>", ""); } catch { /*do nothing*/ }
 			}
 			return !Empty;
+		}
+		public bool HasFlag(string Text,char Flag) {
+			string flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;   //get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
+			flags = flags.Trim('<', '>');
+			return flags.Contains(Flag);
 		}
 		public void Send(string Text) {
 			string Flags = Regex.Match(Text, @"^\<.+\>\b", RegexOptions.Multiline).Value;    //get flags by regex (example)-> https://regexr.com/4obl9 recommend to use external browser.
