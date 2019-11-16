@@ -111,7 +111,7 @@ namespace Command_Server {
 			if (args.Length >= 1) {
 				foreach (string client in args) {
 					if (Program.Clients.ContainsKey(client)) {
-						Program.Clients[client].Disconnect(ClientManager.DisconnectReason.manual);
+						Program.Clients[client].Disconnect(DisconnectReason.manual);
 						Console.WriteLine($"Disconnected from \"{client}\"");
 					} else {
 						Console.WriteLine($"No such client found that named as\"{client}\".");
@@ -180,10 +180,8 @@ namespace Command_Server {
 				if (args.Length == 1) {
 					if (Program.Clients.ContainsKey(args[0])) {
 						Client = Program.Clients[args[0]];
-						ClientManager.ReadClients = false;
-						Client.Send("<$>directcmd");      //sey client to run direct cmd protocol
-																			//this command need custom stream listener
-						
+						Program.readClients = false;
+						Client.Send("<$>directcmd");						//sey client to run direct cmd protocol
 						Listener.Start(Client);
 						Commands["closecmd"] = new command(Close);
 						Commands.Remove("directcmd");

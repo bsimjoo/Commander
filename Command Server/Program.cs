@@ -15,6 +15,7 @@ namespace Command_Server
 		static internalcmds internalCmd = new internalcmds();
 		static TcpListener Listener = default(TcpListener);
 		public static string DefPrefix = "";
+		public static bool readClients = true;
 		static void Main(string[] args) {
 			Console.Title = $"Commander [{Clients.Count} clients]";
 			Log(logType.Info, "Running server...");
@@ -34,12 +35,32 @@ namespace Command_Server
 			Listener.Start();
 			Log(logType.Info, $"Tcp listener started on {myIP}:1111");
 			Log(logType.Info, "Waiting for a connection...");
-			Thread th = new Thread(server);
-			th.Start();
+			Thread serverthread = new Thread(server);
+			serverthread.Start();
+			Thread ClientsThread = new Thread(CheckClient);
+			ClientsThread.Start();
 			while (true) {
 				string input = Console.ReadLine();
 				ReadInput(input.StartsWith("!")?input:DefPrefix+input);
 			}
+		}
+		private static void CheckClient() {
+			while (true) {
+				Thread.Sleep(100);      //limit usage of resources and check for client connection state every 5 seconds.
+				if (readClients)
+					foreach (var cl in Clients.Values) {
+						if (cl.ClientSocket.Connected) {
+							if (cl.Read(false, out string Text) && !cl.Muted) {
+								ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"Output from \"{cl.IDName}\"".PadRight(Console.WindowWidth - 1, '='));
+								Console.WriteLine(Text);
+								ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"=".PadRight(Console.WindowWidth - 1, '=') + '\n');
+							}
+						} else {
+							cl.Disconnect(DisconnectReason.clientClosed);
+						}
+					}
+			}
+			
 		}
 		public static void ReadInput(string input) {
 			if (input.StartsWith("!")) {
@@ -59,31 +80,33 @@ namespace Command_Server
 				Socket s = Listener.AcceptSocket();
 				ClientManager newClient = new ClientManager(s);
 				newClient.Disconnected += Client_Disconnected;
-				Log(logType.Info, $"A client connected from: {s.RemoteEndPoint}");
-				Log(logType.Info, string.Format("Computer name: {0}", newClient.ClientInfo));
-				string key = newClient.ClientInfo[2].ToLower();
-				if (Clients.ContainsKey(key) && !Clients.ContainsKey(newClient.ClientInfo[0].ToLower())) {
-					Log(logType.Warning, "Custom name exist, assigning with computer name.");
-					if (newClient.ClientInfo[0] == "") {
-						Log(logType.Error, "No custom name. cannot assign client by a name.");
-						newClient.Disconnect(ClientManager.DisconnectReason.internalError);
+				if (newClient.Connect()) {
+					Log(logType.Info, $"A client connected from: {s.RemoteEndPoint}");
+					Log(logType.Info, string.Format("Computer name: {0}\tUserName: {1}\tCustomName: {2}", newClient.ClientInfo));
+					string key = newClient.ClientInfo[2].ToLower();
+					if (Clients.ContainsKey(key) && !Clients.ContainsKey(newClient.ClientInfo[0].ToLower())) {
+						Log(logType.Warning, "Custom name exist, assigning with computer name.");
+						if (newClient.ClientInfo[0] == "") {
+							Log(logType.Error, "No custom name. cannot assign client by a name.");
+							newClient.Disconnect(DisconnectReason.internalError);
+							continue;
+						} else
+							key = newClient.ClientInfo[0].ToLower();
+					} else if (Clients.ContainsKey(newClient.ClientInfo[2].ToLower())) {
+						Log(logType.Error, "Same name exists, so cannot assign client. Please change custom name for next time");
+						newClient.Disconnect(DisconnectReason.internalError);
 						continue;
 					} else
-						key = newClient.ClientInfo[0].ToLower() ;
-				} else if (Clients.ContainsKey(newClient.ClientInfo[2].ToLower())) {
-					Log(logType.Error, "Same name exists, so cannot assign client. Please change custom name for next time");
-					newClient.Disconnect(ClientManager.DisconnectReason.internalError);
-					continue;
-				} else
-					key= newClient.ClientInfo[2].ToLower();
-				newClient.IDName = key;
-				Clients[key] = newClient;
-				Log(logType.Info, $"Assigned as: {key}");
-				Console.Title = $"Commander [{Clients.Count} client(s)]";
+						key = newClient.ClientInfo[2].ToLower();
+					newClient.IDName = key;
+					Clients[key] = newClient;
+					Log(logType.Info, $"Assigned as: {key}");
+					Console.Title = $"Commander [{Clients.Count} client(s)]";
+				}
 			}
 		}
 
-		private static void Client_Disconnected(ClientManager client, ClientManager.DisconnectReason r) {
+		private static void Client_Disconnected(ClientManager client, DisconnectReason r) {
 			if (Clients.ContainsKey(client.ClientInfo[0]))
 				Clients.Remove(client.ClientInfo[0]);
 			else if (Clients.ContainsKey(client.ClientInfo[2]))

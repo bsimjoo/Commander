@@ -16,32 +16,20 @@ namespace Command_Server
 		public string[] ClientInfo = new string[3];
 		public string IDName { get; set; }
 		public static bool ReadClients = true;		//for direct cmd there's no need to read clients stream by checkClient thread
-		public ClientManager(Socket cs) {
-			ClientSocket = cs;
+		public ClientManager(Socket cs) => ClientSocket = cs;
+		public bool Connect() {
 			Program.Log(Program.logType.Info, "new client detected, getting information");
 			Send("<$>info");        //get client info by sending $ flag and info keyword
 			string Text = "";
 			if (Read(true, out Text)) {     //check is there any thing to read?
 				string[] Parts = Text.Split(';');           //ComputerName;UserName;CostumName
 				Array.Copy(Parts, ClientInfo, Parts.Length);        //save client info as an array property of client
+				return true;
 			} else {
 				Console.WriteLine("Request timed out. waited for {0}s", WaitSec);
 				Disconnect(DisconnectReason.timedOut);
+				return false;
 			}
-			Thread checkThread = new Thread(new ParameterizedThreadStart(CheckClient));
-			checkThread.Start(this);
-		}
-		private static void CheckClient(object client) {
-			ClientManager cl = client as ClientManager;
-			while (cl.ClientSocket.Connected) {
-				Thread.Sleep(10);      //limit usage of resources and check for client connection state every 5 seconds.
-				if (cl.Read(false, out string Text)&&ReadClients) {
-					Program.ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"Output from \"{cl.IDName}\"".PadRight(Console.WindowWidth - 1, '='));
-					Console.WriteLine(Text);
-					Program.ColoredWrite(ConsoleColor.Yellow, ConsoleColor.Black, $"=".PadRight(Console.WindowWidth - 1, '=')+'\n');
-				}
-			}
-			cl.Disconnect(DisconnectReason.clientClosed);
 		}
 		public delegate void DisconnectEventHandler(ClientManager client, DisconnectReason r);
 		public event DisconnectEventHandler Disconnected;
@@ -52,7 +40,7 @@ namespace Command_Server
 				else
 					Send("<$>disconnected");
 				ClientSocket.Close();
-				Disconnected(this, r);
+				Disconnected?.Invoke(this, r);
 			}
 		}
 		/// <summary>
@@ -105,9 +93,9 @@ namespace Command_Server
 			} catch (Exception ex) { Program.Log(Program.logType.Error, $"EXCEPTION IN CLIENT/SEND: {ex.Message}"); }
 
 		}
-		public enum DisconnectReason
-		{
-			timedOut, manual, clientClosed, internalError
-		}
+	}
+	public enum DisconnectReason
+	{
+		timedOut, manual, clientClosed, internalError
 	}
 }

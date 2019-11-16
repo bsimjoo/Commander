@@ -17,7 +17,6 @@ namespace CommanderClient
 			Commands["print"] = new command(Print);
 			Commands["info"] = new command(Info);
 			Commands["close"] = new command(Close);
-			Commands["msg"] = new command(ShowMessage);
 			Commands["directcmd"] = new command(DirectCmd.Run);
 			Commands["closecmd"] = new command(DirectCmd.Close);
 		}
@@ -69,10 +68,6 @@ namespace CommanderClient
 
 		static MessageBox messageBox;
 		//uncompleted
-		public static void ShowMessage(string[] args) {
-			messageBox = new MessageBox(args[0], args[1]);
-			messageBox.ShowDialog();
-		}
 		
 		public static void Print(string[] args) {
 			//write output of program, useful for muted clients
